@@ -1,0 +1,1 @@
+yolov8pose/nuclio/yolov8-pose-1024-cropweed.onnx filter=lfs diff=lfs merge=lfs -text
