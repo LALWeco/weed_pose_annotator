@@ -50,20 +50,30 @@ def handler(context, event):
         box, cls, conf = pred_instances.boxes.xyxy[instance_idx, :], pred_instances.boxes.cls[instance_idx].item(), pred_instances.boxes.conf[instance_idx].item()
         keypoints, keypoint_scores = pred_instances.keypoints.xy[instance_idx, 0, :], pred_instances.keypoints.conf[instance_idx].item()
         for label in context.user_data.labels:
+            elements = []
+            for element in label["sublabels"]:
+                if element["name"] == "center":
+                    points = [float(keypoints[0]),float(keypoints[1])]
+                elif element["name"] == "top_left":
+                    points = [float(box[0].item()),float(box[1].item())]
+                elif element["name"] == "top_right":
+                    points = [float(box[2].item()),float(box[1].item())]
+                elif element["name"] == "bottom_left":
+                    points = [float(box[0].item()),float(box[3].item())]
+                elif element["name"] == "bottom_right":
+                    points = [float(box[2].item()),float(box[3].item())]
+                elements.append({
+                    "label": element["name"],
+                    "type": "points",
+                    "outside": 0 if conf_threshold < keypoint_scores else 1,
+                    "points": points,
+                    "confidence": str(keypoint_scores),
+                })
             skeleton = {
                 "confidence": str(conf),
                 "label": label["name"],
                 "type": "skeleton",
-                "elements": [{
-                    "label": element["name"],
-                    "type": "points",
-                    "outside": 0 if conf_threshold < keypoint_scores else 1,
-                    "points": [
-                        float(keypoints[0]),
-                        float(keypoints[1])
-                    ],
-                    "confidence": str(keypoint_scores),
-                } for element in label["sublabels"]],
+                "elements": elements
             }
 
             if not all([element['outside'] for element in skeleton["elements"]]):
