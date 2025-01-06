@@ -1,5 +1,5 @@
 # CVAT automatic annotation with YOLOv8 pose model
-
+This feature was tested with CVAT `v2.24.0` and Nuclio `v1.13.0` on branch `bs/fixed_skeleton_upload` branch.
 ## 1. Install CVAT
 In order to enable serverless functions in CVAT, we need to launch CVAT as follows
 ```bash
@@ -34,3 +34,8 @@ Assuming that the model has been deployed successfully, we can test it using the
 You can map the crop and weed classes to the appropriate classes and if the skeletons match with the config file as shown in the screenshot below, the keypoints will be matched automatically. Once the mapping has been done, you can click on the `Annotate` button to annotate the current frame.
 
 ![alt text](sample.png)
+
+## TODO
+- [ ] Test on the latest CVAT version in the `develop` branch. 
+- [ ] May not work on the v2.16.0 version in the remote server, if not, then update the remote server to the compatible version. 
+- [ ] Add unique classes for each crop in the market garden and update the function.yaml file accordingly. 
