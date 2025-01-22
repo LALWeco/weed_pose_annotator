@@ -10,7 +10,7 @@ metadata:
     spec: |
       [
         { "id": 1, "name": "background", "type": "mask" },
-        { "id": 2, "name": "crop", "type": "mask" },
+        { "id": 2, "name": "sugarbeet", "type": "mask" },
         { "id": 3, "name": "weed", "type": "mask" }
       ]
 

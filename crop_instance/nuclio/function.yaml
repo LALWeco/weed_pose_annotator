@@ -9,9 +9,9 @@ metadata:
     type: detector
     spec: |
       [
-        { "id": 1, "name": "sugarbeet", "type": "mask" },
-        { "id": 2, "name": "weed", "type": "mask" },
-        { "id": 3, "name": "background", "type": "mask" }
+        { "id": 1, "name": "background", "type": "mask" },
+        { "id": 2, "name": "sugarbeet", "type": "mask" },
+        { "id": 3, "name": "weed", "type": "mask" }
       ]
 
 spec:
@@ -21,9 +21,35 @@ spec:
   eventTimeout: 60s
 
   build:
-    image: cvat.openvino.omz.public.mask_rcnn_inception_resnet_v2_atrous_coco
-    baseImage: cvat.openvino.omz.public.mask_rcnn_inception_resnet_v2_atrous_coco.base
+    image: cvat.pth.facebookresearch.detectron2.mask2former.phenobench:latest-gpu
+    baseImage: nvcr.io/nvidia/cuda:11.8.0-cudnn8-devel-ubuntu20.04
 
+    directives:
+      preCopy:
+        - kind: ENV
+          value: DEBIAN_FRONTEND=noninteractive
+        - kind: RUN
+          value: apt-get update && apt-get install -y git curl python3.8 python3-pip python3-apt
+        - kind: RUN
+          value: ln -s /usr/bin/pip3 /usr/local/bin/pip && ln -s /usr/bin/python3 /usr/bin/python
+        - kind: RUN
+          value: python -m pip install opencv-python==4.8.0.74 scikit-image pillow
+        - kind: RUN
+          value: python -m pip install torch==2.0.1 torchvision==0.15.2 --index-url https://download.pytorch.org/whl/cu118
+        - kind: WORKDIR
+          value: /opt/nuclio
+        - kind: RUN
+          value: python -m pip install 'git+http://github.com/niqbal996/detectron2@8996897'
+        - kind: RUN
+          value: git clone http://github.com/niqbal996/Mask2Former.git
+        - kind: RUN
+          value: cd Mask2Former && pip install -r requirements.txt
+        - kind: ENV
+          value: PYTHONPATH=/opt/nuclio/Mask2Former
+        - kind: ENV
+          value: FORCE_CUDA=1
+        - kind: RUN
+          value: cd Mask2Former/mask2former/modeling/pixel_decoder/ops && TORCH_CUDA_ARCH_LIST='8.6' FORCE_CUDA=1 python setup.py build install
   triggers:
     myHttpTrigger:
       maxWorkers: 2

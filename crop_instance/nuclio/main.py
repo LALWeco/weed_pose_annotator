@@ -28,6 +28,8 @@ def handler(context, event):
     image = Image.open(buf).convert("RGB")
 
     results = context.user_data.model.infer(image, context)
-
+    # context.logger.info(f"Type of results[1]: {type(results[1])}")
+    # context.logger.info(f"Types of values for each key: {[(key, type(value)) for key, value in results[1].items()]}")
+    # context.logger.info(results[1])
     return context.Response(body=json.dumps(results), headers={},
         content_type='application/json', status_code=200)

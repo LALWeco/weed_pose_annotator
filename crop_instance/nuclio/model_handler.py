@@ -22,10 +22,12 @@ import mask2former
 from detectron2.checkpoint import DetectionCheckpointer
 from register_phenobench import register_phenobench
 
+MASK_THRESHOLD = 0
+
 def to_cvat_mask(box: list, mask):
     xtl, ytl, xbr, ybr = box
     flattened = mask[ytl:ybr + 1, xtl:xbr + 1].flat[:].tolist()
-    flattened.extend([xtl, ytl, xbr, ybr])
+    flattened.extend([int(xtl), int(ytl), int(xbr), int(ybr)])  # Convert to Python int
     return flattened
 
 def add_deeplab_config(cfg):
@@ -52,7 +54,6 @@ def add_deeplab_config(cfg):
     cfg.MODEL.RESNETS.RES5_MULTI_GRID = [1, 2, 4]
     # ResNet stem type from: `basic`, `deeplab`
     cfg.MODEL.RESNETS.STEM_TYPE = "deeplab"
-
 
 def add_maskformer2_config(cfg):
     """
@@ -164,8 +165,6 @@ def add_maskformer2_config(cfg):
     # the original paper.
     cfg.MODEL.MASK_FORMER.IMPORTANCE_SAMPLE_RATIO = 0.75
 
-MASK_THRESHOLD = 0.5
-
 # Ref: https://software.intel.com/en-us/forums/computer-vision/topic/804895
 def segm_postprocess(box: list, raw_cls_mask, im_h, im_w):
     xmin, ymin, xmax, ymax = box
@@ -174,11 +173,11 @@ def segm_postprocess(box: list, raw_cls_mask, im_h, im_w):
     height = ymax - ymin + 1
 
     result = np.zeros((im_h, im_w), dtype=np.uint8)
-    resized_mask = cv2.resize(raw_cls_mask, dsize=(width, height), interpolation=cv2.INTER_CUBIC)
+    # resized_mask = cv2.resize(raw_cls_mask, dsize=(width, height), interpolation=cv2.INTER_CUBIC)
 
     # extract the ROI of the image
-    result[ymin:ymax + 1, xmin:xmax + 1] = (resized_mask > MASK_THRESHOLD).astype(np.uint8) * 255
-
+    # result[ymin:ymax + 1, xmin:xmax + 1] = (resized_mask > MASK_THRESHOLD).astype(np.uint8)
+    result[np.where(raw_cls_mask > 0)] = 255
     return result
 
 class ModelHandler:
@@ -196,8 +195,8 @@ class ModelHandler:
         self.cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.5
         self.cfg.MODEL.ROI_HEADS.NMS_THRESH_TEST = 0.5
         self.model = build_model(self.cfg)
-        #checkpointer = DetectionCheckpointer(self.model)
-        #checkpointer.load(self.cfg.MODEL.WEIGHTS)
+        checkpointer = DetectionCheckpointer(self.model)
+        checkpointer.load(self.cfg.MODEL.WEIGHTS)
         self.model.eval()
         self.aug = T.ResizeShortestEdge(
             [self.cfg.INPUT.MIN_SIZE_TEST, self.cfg.INPUT.MIN_SIZE_TEST], self.cfg.INPUT.MAX_SIZE_TEST
@@ -214,22 +213,21 @@ class ModelHandler:
         image = torch.as_tensor(image.astype("float32").transpose(2, 0, 1))
         image.to(self.cfg.MODEL.DEVICE)
         inputs = {"image": image, "height": height, "width": width}
-
         predictions = self.model([inputs])[0]
-
-        context.logger.info("predictions: {}".format(predictions))
         results = []
         masks = predictions['panoptic_seg'][0]
         mask_ids = predictions['panoptic_seg'][1]
-        for _, object in enumerate(mask_ids):
+        for _, object in enumerate(mask_ids[1:]):
             # context.logger.info("object: {}".format(object))
-            obj_class = object['category_id']
+            obj_class = object['category_id'] # 0 indexed class id
             obj_value = object['id']
-            obj_label = self.labels[int(obj_class)-1]
-            context.logger.info("labels: {}".format(self.labels))
-            mask = masks[obj_value]
+            obj_label = self.labels[int(obj_class)+1] # 1 indexed label CVAT convention
+            # context.logger.info("Mask format: {}".format(masks.shape))
+            # context.logger.info("Mask data: {}".format(masks))
+            mask = np.zeros((height, width))
+            mask[masks == obj_value] = masks[masks == obj_value]
             # box coordinates in image pixel space
-            rows, cols = np.where(mask == 1)
+            rows, cols = np.where(mask == obj_value)
             if len(rows) == 0 or len(cols) == 0:
                 continue
 
@@ -238,20 +236,18 @@ class ModelHandler:
             ytl = np.min(rows)
             xbr = np.max(cols)
             ybr = np.max(rows)
-
-            mask = segm_postprocess((xtl, ytl, xbr, ybr), mask, image.height, image.width)
+            mask = segm_postprocess((xtl, ytl, xbr, ybr), mask, height, width)
             cvat_mask = to_cvat_mask((xtl, ytl, xbr, ybr), mask)
 
             contours = find_contours(mask, MASK_THRESHOLD)
             contour = contours[0]
             contour = np.flip(contour, axis=1)
             contour = approximate_polygon(contour, tolerance=2.5)
-
             if len(contour) < 3:
                 continue
-
+            # context.logger.info(list(set(cvat_mask)))
             results.append({
-                "confidence": str(obj_value),
+                "confidence": str(1.0),
                 "label": obj_label,
                 "points": contour.ravel().tolist(),
                 "mask": cvat_mask,
