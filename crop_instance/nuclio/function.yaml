@@ -1,0 +1,40 @@
+# To build the function you need to adjust docker settings. Be sure that you
+# have enough memory (more than 4GB). Look here how to do that
+# https://stackoverflow.com/questions/44417159/docker-process-killed-with-cryptic-killed-message
+metadata:
+  name: phenobench-pytorch-mask2former-panoptic
+  namespace: cvat
+  annotations:
+    name: Mask2Former
+    type: detector
+    spec: |
+      [
+        { "id": 1, "name": "sugarbeet", "type": "mask" },
+        { "id": 2, "name": "weed", "type": "mask" },
+        { "id": 3, "name": "background", "type": "mask" }
+      ]
+
+spec:
+  description: Mask2Former panoptic segmentation for phenobench dataset using Detectron2
+  runtime: 'python:3.8'
+  handler: main:handler
+  eventTimeout: 60s
+
+  build:
+    image: cvat.openvino.omz.public.mask_rcnn_inception_resnet_v2_atrous_coco
+    baseImage: cvat.openvino.omz.public.mask_rcnn_inception_resnet_v2_atrous_coco.base
+
+  triggers:
+    myHttpTrigger:
+      maxWorkers: 2
+      kind: 'http'
+      workerAvailabilityTimeoutMilliseconds: 10000
+      attributes:
+        maxRequestBodySize: 33554432 # 32MB
+
+  platform:
+    attributes:
+      restartPolicy:
+        name: always
+        maximumRetryCount: 3
+      mountMode: volume
