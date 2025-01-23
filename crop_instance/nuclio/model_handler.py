@@ -192,7 +192,8 @@ class ModelHandler:
         self.cfg.DATASETS.TEST = ('phenobench_val',)
         self.cfg.MODEL.DEVICE = 'cpu'
         self.cfg.MODEL.WEIGHTS = "/opt/nuclio/model_final_synthetic.pth"
-        self.cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.5
+        self.cfg.MODEL.ROI_HEADS.POSITIVE_FRACTION = 0.25
+        self.cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.05
         self.cfg.MODEL.ROI_HEADS.NMS_THRESH_TEST = 0.5
         self.model = build_model(self.cfg)
         checkpointer = DetectionCheckpointer(self.model)
@@ -217,7 +218,8 @@ class ModelHandler:
         results = []
         masks = predictions['panoptic_seg'][0]
         mask_ids = predictions['panoptic_seg'][1]
-        for _, object in enumerate(mask_ids[1:]):
+        context.logger.info("instances found: {}".format(len(mask_ids)))
+        for _, object in enumerate(mask_ids):
             # context.logger.info("object: {}".format(object))
             obj_class = object['category_id'] # 0 indexed class id
             obj_value = object['id']
@@ -239,12 +241,12 @@ class ModelHandler:
             mask = segm_postprocess((xtl, ytl, xbr, ybr), mask, height, width)
             cvat_mask = to_cvat_mask((xtl, ytl, xbr, ybr), mask)
 
-            contours = find_contours(mask, MASK_THRESHOLD)
+            contours = find_contours(mask)
             contour = contours[0]
             contour = np.flip(contour, axis=1)
-            contour = approximate_polygon(contour, tolerance=2.5)
-            if len(contour) < 3:
-                continue
+            contour = approximate_polygon(contour, tolerance=1.0)
+            # if len(contour) < 3:
+            #     continue
             # context.logger.info(list(set(cvat_mask)))
             results.append({
                 "confidence": str(1.0),
@@ -253,4 +255,5 @@ class ModelHandler:
                 "mask": cvat_mask,
                 "type": "mask",
             })
+        context.logger.info("Instances processed: {}".format(len(results)))
         return results
