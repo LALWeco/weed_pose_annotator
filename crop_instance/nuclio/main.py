@@ -9,7 +9,7 @@ def init_context(context):
     context.logger.info("Init context...  0%")
 
     # Read labels
-    with open("/opt/nuclio/function.yaml", 'rb') as function_file:
+    with open("/opt/nuclio/function-gpu.yaml", 'rb') as function_file:
         functionconfig = yaml.safe_load(function_file)
 
     labels_spec = functionconfig['metadata']['annotations']['spec']
@@ -28,8 +28,6 @@ def handler(context, event):
     image = Image.open(buf).convert("RGB")
 
     results = context.user_data.model.infer(image, context)
-    # context.logger.info(f"Type of results[1]: {type(results[1])}")
-    # context.logger.info(f"Types of values for each key: {[(key, type(value)) for key, value in results[1].items()]}")
-    # context.logger.info(results[1])
+
     return context.Response(body=json.dumps(results), headers={},
         content_type='application/json', status_code=200)

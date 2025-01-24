@@ -2,10 +2,10 @@
 # have enough memory (more than 4GB). Look here how to do that
 # https://stackoverflow.com/questions/44417159/docker-process-killed-with-cryptic-killed-message
 metadata:
-  name: phenobench-pytorch-mask2former-panoptic
+  name: phenobench-pytorch-mask2former-plants
   namespace: cvat
   annotations:
-    name: Mask2Former
+    name: Mask2Former Plants
     type: detector
     spec: |
       [
@@ -15,7 +15,7 @@ metadata:
       ]
 
 spec:
-  description: Mask2Former panoptic segmentation for phenobench dataset using Detectron2
+  description: Mask2Former plant instance segmentation for phenobench dataset using Detectron2
   runtime: 'python:3.8'
   handler: main:handler
   eventTimeout: 60s
@@ -60,7 +60,7 @@ spec:
 
   resources:
     limits:
-      nvidia.com/gpu: 1
+      nvidia.com/gpu: 2
 
   platform:
     attributes:

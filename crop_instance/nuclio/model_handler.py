@@ -8,22 +8,56 @@ import os
 import cv2
 import numpy as np
 import torch
-# from model_loader import ModelLoader
-# from shared import to_cvat_mask
+
 from skimage.measure import approximate_polygon, find_contours
-from detectron2.engine.defaults import DefaultPredictor
-from detectron2.data import MetadataCatalog
+# from detectron2.engine.defaults import DefaultPredictor
+# from detectron2.data import MetadataCatalog
 from detectron2.modeling import build_model
-import detectron2.data.transforms as T
 from detectron2.config import get_cfg
 from detectron2.config import CfgNode as CN
-from config import base_config
-import mask2former
 from detectron2.checkpoint import DetectionCheckpointer
-from register_phenobench import register_phenobench
+from detectron2.data import transforms as T
+import mask2former
+from mask2former.data.datasets.register_phenobench_panoptic_annos_semseg import register_pheno_panoptic_separated
 
 MASK_THRESHOLD = 0
 
+def get_metadata_plants():
+    meta = {}
+
+    # Define classes and colors
+    thing_classes = ["crop", "weed"]
+    thing_colors = [(0, 200, 0), (200, 0, 0)]
+    stuff_classes = ["soil"]
+    stuff_colors = [(0, 0, 200)]
+
+    meta["thing_classes"] = thing_classes
+    meta["thing_colors"] = thing_colors
+    meta["stuff_classes"] = stuff_classes
+    meta["stuff_colors"] = stuff_colors
+
+    # Map dataset IDs to contiguous IDs
+    meta["thing_dataset_id_to_contiguous_id"] = {1: 1, 2: 2}  # 1 -> crop, 2 -> weed
+    meta["stuff_dataset_id_to_contiguous_id"] = {0: 0}  # 255 -> soil
+
+    # Set ignore label
+    meta["ignore_label"] = 255
+
+    meta["stuff_classes"] = stuff_classes + thing_classes
+    meta["stuff_colors"] = stuff_colors + thing_colors
+    meta["stuff_dataset_id_to_contiguous_id"].update(meta["thing_dataset_id_to_contiguous_id"])
+    return meta
+
+def register_phenobench():
+    root_dir = "/home/niqbal/datasets/sugarbeets_leaves"
+    register_pheno_panoptic_separated(name="phenobench_train", 
+                        metadata=get_metadata_plants(),
+                        image_root=os.path.join(root_dir, "images"),
+                        panoptic_root=os.path.join(root_dir, "leafs_panoptic_train"),
+                        panoptic_json=os.path.join(root_dir, "leafs_panoptic_train.json"),
+                        sem_seg_root=os.path.join(root_dir, "leafs_panoptic_semseg_train")
+                        )
+    
 def to_cvat_mask(box: list, mask):
     xtl, ytl, xbr, ybr = box
     flattened = mask[ytl:ybr + 1, xtl:xbr + 1].flat[:].tolist()
@@ -186,11 +220,10 @@ class ModelHandler:
         add_deeplab_config(self.cfg)
         add_maskformer2_config(self.cfg)
         register_phenobench()
-        # self.cfg.merge_from_file("/opt/nuclio/Base-PhenorobPlants-PanopticSegmentation.yaml")
         self.cfg.merge_from_file("/opt/nuclio/mask2former_phenobench.yaml")
         self.cfg.DATASETS.TRAIN = ('phenobench_train',)
         self.cfg.DATASETS.TEST = ('phenobench_val',)
-        self.cfg.MODEL.DEVICE = 'cpu'
+        self.cfg.MODEL.DEVICE = 'cuda'
         self.cfg.MODEL.WEIGHTS = "/opt/nuclio/model_final_synthetic.pth"
         self.cfg.MODEL.ROI_HEADS.POSITIVE_FRACTION = 0.25
         self.cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.05
@@ -216,7 +249,7 @@ class ModelHandler:
         inputs = {"image": image, "height": height, "width": width}
         predictions = self.model([inputs])[0]
         results = []
-        masks = predictions['panoptic_seg'][0]
+        masks = predictions['panoptic_seg'][0].cpu().numpy()
         mask_ids = predictions['panoptic_seg'][1]
         context.logger.info("instances found: {}".format(len(mask_ids)))
         for _, object in enumerate(mask_ids):
