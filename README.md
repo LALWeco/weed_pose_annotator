@@ -5,14 +5,14 @@ In order to enable serverless functions in CVAT, we need to launch CVAT as follo
 ```bash
 git clone https://github.com/opencv/cvat.git
 cd cvat
-git checkout bs/fixed_skeleton_upload
+git checkout v2.32.0
 docker compose -f docker-compose.yml -f components/serverless/docker-compose.serverless.yml up -d
 ```
 Afterwards, we need to install nuclio to enable serverless functions in CVAT. This was tested with version 1.13.0.
 ```bash
 wget https://github.com/nuclio/nuclio/releases/download/1.13.0/nuctl-1.13.0-linux-amd64
 sudo chmod +x nuctl-1.13.0-linux-amd64
-sudo ln -sf $(pwd)/nuctl-<version>-linux-amd64 /usr/local/bin/nuctl
+sudo ln -sf $(pwd)/nuctl-1.13.0-linux-amd64 /usr/local/bin/nuctl
 ```
 Now that nuclio has been setup, we need to create a new project in CVAT as follows:
 ```bash
@@ -39,3 +39,4 @@ You can map the crop and weed classes to the appropriate classes and if the skel
 - [ ] Test on the latest CVAT version in the `develop` branch. 
 - [ ] May not work on the v2.16.0 version in the remote server, if not, then update the remote server to the compatible version. 
 - [ ] Add unique classes for each crop in the market garden and update the function.yaml file accordingly. 
+- [ ] Convert the output dataset format consistent with the Synthetic dataset format for training.  
